@@ -123,28 +123,28 @@ body.debug .screen .slider {
 	background-color: green;
 }
 
-.screen .main {
+.screen .text {
 	overflow: hidden;
 }
 
-.screen .main .row span,
-.screen .main .row a {
+.screen .text .row span,
+.screen .text .row a {
 	height: inherit;
 	display: inline-block;
 	vertical-align: top;
 }
 
-body.debug .screen .main .link {
+body.debug .screen .text .link {
 	outline: 1px solid red;
 	cursor: pointer;
 	cursor: hand;
 }
 
-.screen .main .picture {
+.screen .text .picture {
 	vertical-align: text-top;
 }
 
-.screen .main-slider {
+.screen .text-slider {
 	width: 1px;
 /* 	background-color: gray; */
 }
