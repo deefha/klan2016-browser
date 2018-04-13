@@ -1,7 +1,7 @@
 (function($) {
 
-if ($('#klan-app-viewer').length && !!$.prototype.klan_app_viewer) {
-	$('#klan-app-viewer').klan_app_viewer({
+if ($('#klan-app-browser').length && !!$.prototype.klan_app_browser) {
+	$('#klan-app-browser').klan_app_browser({
 		issue: '00'
 	});
 }
