@@ -1,0 +1,320 @@
+/*! HTML5 Boilerplate v5.0 | MIT License | http://h5bp.com/ */
+
+html {
+    color: #222;
+    font-size: 1em;
+    line-height: 1.4;
+}
+
+::-moz-selection {
+    background: #b3d4fc;
+    text-shadow: none;
+}
+
+::selection {
+    background: #b3d4fc;
+    text-shadow: none;
+}
+
+hr {
+    display: block;
+    height: 1px;
+    border: 0;
+    border-top: 1px solid #ccc;
+    margin: 1em 0;
+    padding: 0;
+}
+
+audio,
+canvas,
+iframe,
+img,
+svg,
+video {
+    vertical-align: middle;
+}
+
+fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+}
+
+textarea {
+    resize: vertical;
+}
+
+.browserupgrade {
+    margin: 0.2em 0;
+    background: #ccc;
+    color: #000;
+    padding: 0.2em 0;
+}
+
+
+/* ==========================================================================
+   Author's custom styles
+   ========================================================================== */
+
+body {
+	font-family: 'Play', sans-serif;
+	font-size: 14px;
+	font-weight: normal;
+	color: white;
+	background-color: #101410;
+}
+
+h1 {
+	margin-bottom: 40px;
+	font-size: 30px;
+	font-weight: bold;
+	text-align: center;
+}
+
+p {
+	text-align: justify;
+}
+
+p.slogan {
+	text-align: center;
+}
+
+p.signature {
+	text-align: right;
+}
+
+p.footer {
+	margin-top: 40px;
+	font-size: 12px;
+	text-align: center;
+}
+
+p a {
+	color: #d50000;
+}
+
+#shell {
+	width: 640px;
+	margin: 0 auto;
+}
+
+.screen {
+	width: 640px;
+	height: 480px;
+	margin-top: 40px;
+	background-color: black;
+}
+
+.screen .component,
+.screen .action {
+	position: absolute;
+	background-repeat: no-repeat;
+}
+
+.screen .action {
+	z-index: 100;
+}
+
+body.debug .screen .button {
+	background-color: red;
+}
+
+body.debug .screen .slider {
+	background-color: green;
+}
+
+.screen .main {
+	overflow: hidden;
+}
+
+.screen .main .row span,
+.screen .main .row a {
+	height: inherit;
+	display: inline-block;
+	vertical-align: top;
+}
+
+body.debug .screen .main .link {
+	outline: 1px solid red;
+	cursor: pointer;
+	cursor: hand;
+}
+
+.screen .main .picture {
+	vertical-align: text-top;
+}
+
+.screen .main-slider {
+	width: 1px;
+/* 	background-color: gray; */
+}
+
+body.debug .screen .ad {
+	background-color: blue;
+}
+
+body.debug .screen .action {
+	display: block;
+	width: 100%;
+	height: 100%;
+	cursor: pointer;
+	cursor: hand;
+	outline: 1px solid red;
+	color: red;
+	font-size: 12px;
+	font-weight: bold;
+}
+
+.screen .action a {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.mCSB_scrollTools {
+	left: 318px;
+}
+
+.mCSB_scrollTools .mCSB_draggerContainer {
+	top: 104px;
+	bottom: 45px;
+}
+
+.mCSB_scrollTools .mCSB_dragger .mCSB_dragger_bar {
+	width: 14px;
+	-webkit-border-radius: 0;
+	-moz-border-radius: 0;
+	border-radius: 0;
+}
+
+.mCSB_scrollTools .mCSB_draggerRail {
+	background-color: transparent;
+}
+
+
+/* ==========================================================================
+   Media Queries
+   ========================================================================== */
+
+@media only screen and (min-width: 35em) {
+
+}
+
+@media print,
+       (-o-min-device-pixel-ratio: 5/4),
+       (-webkit-min-device-pixel-ratio: 1.25),
+       (min-resolution: 120dpi) {
+
+}
+
+/* ==========================================================================
+   Helper classes
+   ========================================================================== */
+
+.hidden {
+    display: none !important;
+    visibility: hidden;
+}
+
+.visuallyhidden {
+    border: 0;
+    clip: rect(0 0 0 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+}
+
+.visuallyhidden.focusable:active,
+.visuallyhidden.focusable:focus {
+    clip: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    position: static;
+    width: auto;
+}
+
+.invisible {
+    visibility: hidden;
+}
+
+.clearfix:before,
+.clearfix:after {
+    content: " ";
+    display: table;
+}
+
+.clearfix:after {
+    clear: both;
+}
+
+.clearfix {
+    *zoom: 1;
+}
+
+/* ==========================================================================
+   Print styles
+   ========================================================================== */
+
+@media print {
+    *,
+    *:before,
+    *:after {
+        background: transparent !important;
+        color: #000 !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+    }
+
+    a,
+    a:visited {
+        text-decoration: underline;
+    }
+
+    a[href]:after {
+        content: " (" attr(href) ")";
+    }
+
+    abbr[title]:after {
+        content: " (" attr(title) ")";
+    }
+
+    a[href^="#"]:after,
+    a[href^="javascript:"]:after {
+        content: "";
+    }
+
+    pre,
+    blockquote {
+        border: 1px solid #999;
+        page-break-inside: avoid;
+    }
+
+    thead {
+        display: table-header-group;
+    }
+
+    tr,
+    img {
+        page-break-inside: avoid;
+    }
+
+    img {
+        max-width: 100% !important;
+    }
+
+    p,
+    h2,
+    h3 {
+        orphans: 3;
+        widows: 3;
+    }
+
+    h2,
+    h3 {
+        page-break-after: avoid;
+    }
+}
