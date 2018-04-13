@@ -2,7 +2,7 @@
 
 $.klan = $.klan || {};
 $.klan.api = $.klan.api || {};
-$.klan.api.root = 'https://data.klan2016.cz/v1/';
+$.klan.api.root = 'https://api.klan2016.cz/';
 $.klan.api.cache = {};
 
 

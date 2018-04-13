@@ -23,20 +23,22 @@ $.klan.app.browser = function(element, options) {
 	plugin.settings = {}
 	plugin.cache = {}
 	plugin.actual = {}
-	plugin.previous = {}
 	plugin.wrappers = {}
 	plugin.locks = {}
 	plugin.flags = {}
+	plugin.engine = {
+		'ivars': {},
+		'svars': {},
+		'screen': null,
+		'buttons': {},
+		'ads': {},
+		'text': null
+	}
 
 	plugin.init = function() {
 		log('init: begin');
 
 		plugin.settings = $.extend({}, defaults, options);
-
-		$('head').append(sprintf(
-			'<link rel="stylesheet" href="https://data.klan2016.cz/v1/%s/fonts.css" type="text/css" />',
-			plugin.settings.issue
-		));
 
 		if ($.query.get('debug')) {
 			$('body').addClass('debug');
@@ -50,37 +52,26 @@ $.klan.app.browser = function(element, options) {
 		]).done(function(responses) {
 			log('init: issue/images, issue/screens, issue/texts async response');
 
+			plugin.cache.images = responses[0].images;
+			plugin.cache.screens = responses[1].screens;
+			plugin.cache.texts = responses[2].texts;
+
+			plugin.cache.texts_indexed = {}
+			$.each(plugin.cache.texts, function(text_index, text) {
+				plugin.cache.texts_indexed[text.name.replace('/', '\\')] = text_index;
+			});
+
 			plugin.actual.issue = plugin.settings.issue;
 			plugin.actual.screen = plugin.settings.screen;
 			plugin.actual.text = plugin.settings.text;
 			plugin.actual.params = plugin.settings.params;
-
-			plugin.cache.images_raw = $.klan.api.issue.images(plugin.settings.issue);
-			plugin.cache.screens_raw = $.klan.api.issue.screens(plugin.settings.issue);
-			plugin.cache.texts_raw = $.klan.api.issue.texts(plugin.settings.issue);
-
-			plugin.cache.images = [];
-			plugin.cache.screens = [];
-			plugin.cache.texts = [];
-
-			$.each(plugin.cache.images_raw, function(index, item) {
-				plugin.cache.images[item.id] = item;
-			});
-
-			$.each(plugin.cache.screens_raw, function(index, item) {
-				plugin.cache.screens[item.id] = item;
-			});
-
-			$.each(plugin.cache.texts_raw, function(index, item) {
-				plugin.cache.texts[item.id] = item;
-			});
 
 			crossroads.addRoute('/{issue}/{screen}/:text:/:params_raw:', function(issue, screen, text, params_raw) {
 				log(sprintf('crossroads: parse (issue="%s", screen="%s", text="%s", params_raw="%s")', issue, screen, text, params_raw));
 
 				plugin.actual.issue = issue;
 				plugin.actual.screen = parseInt(screen);
- 				plugin.actual.text = (text && text != '-') ? text : undefined;
+				plugin.actual.text = (text && text != '-') ? text : undefined;
 				plugin.actual.params_raw = params_raw ? params_raw.split('|') : [];
 
 				if (plugin.actual.params_raw.length) {
@@ -101,24 +92,11 @@ $.klan.app.browser = function(element, options) {
 					screen_render(true);
 				});
 
-// 				if (plugin.previous.date !== undefined && plugin.actual.date.isSame(plugin.previous.date, 'day')) {
-// 					listing_render();
-// 				}
-// 				else {
-// 					calendar_load(function() {
-// 						calendar_render(true);
-// 					});
-// 
-// 					listing_load(function() {
-// 						listing_render(true);
-// 					});
-// 				}
-
-// 				log('crossroads: starting loop');
-// 				$(document).everyTime(5500, 'klan.app.browser.loop', function() {
-// 					log('* loop tick');
-// //					listing_render(); // TODO?
-// 				});
+	// 				log('crossroads: starting loop');
+	// 				$(document).everyTime(5500, 'klan.app.browser.loop', function() {
+	// 					log('* loop tick');
+	// //					listing_render(); // TODO?
+	// 				});
 			});
 
 			crossroads.addRoute('/{issue}', function(issue) {
@@ -148,7 +126,7 @@ $.klan.app.browser = function(element, options) {
 			}
 
 			wrappers_prepare();
- 			screen_prepare();
+			screen_prepare();
 
 			hasher.initialized.add(hasher_init);
 			hasher.changed.add(hasher_parse);
@@ -174,12 +152,12 @@ $.klan.app.browser = function(element, options) {
 
 		$element.html(sprintf(
 			'<div class="klan-app-browser klan-issue-%s klan-clearfix">' +
-				'<div class="screen cro-clearfix"></div>' +
+				'<div class="wrapper-screen cro-clearfix"></div>' +
 			'</div>',
 			plugin.actual.issue
 		));
 
-		plugin.wrappers.screen = $('.screen', $element);
+		plugin.wrappers.screen = $('.wrapper-screen', $element);
 
 		log('wrappers_prepare: prepared');
 		flag('wrappers', 'prepared');
@@ -215,7 +193,11 @@ $.klan.app.browser = function(element, options) {
 		log('screen_prepare: locking');
 		lock('screen_prepare');
 
-		log('screen_prepare: no code');
+		output = sprintf(
+			'<div class="screen"></div>'
+		);
+
+		plugin.wrappers.screen.html(output);
 
 		log('screen_prepare: prepared');
 		flag('screen', 'prepared');
@@ -250,21 +232,65 @@ $.klan.app.browser = function(element, options) {
 		log('screen_load: locking');
 		lock('screen_load');
 
-		log('screen_load: no code');
+		unflag('screen', 'loaded');
 
-		log('screen_load: loaded');
-		flag('screen', 'loaded');
+		log('screen_load: issue/screens/id async call');
+		$.when.all([
+			$.klan.api.issue.screens(plugin.actual.issue, plugin.actual.screen)
+		]).done(function(responses) {
+			log('screen_load: issue/screens/id async response');
+			plugin.cache.screen = responses[0];
 
-		if (typeof callback === 'undefined') {
-			log('screen_load: no callback');
-		}
-		else {
-			log(sprintf('screen_load: callback (%s)', callback.toString()));
-			callback();
-		}
+			$.each(plugin.cache.screen.macros, function(macro_index, macro) {
+				if (macro.type == 'ivar/mov') {
+					plugin.engine.ivars[macro.params.variable] = macro.params.value;
+				}
 
-		log('screen_load: unlocking, end');
-		unlock('screen_load');
+				if (macro.type == 'screen') {
+					plugin.engine.screen = macro.params;
+				}
+
+				if (macro.type == 'button') {
+					plugin.engine.buttons[macro.params.id] = macro.params;
+				}
+
+				if (macro.type == 'keybutt') {
+				}
+
+				if (macro.type == 'text') {
+					plugin.engine.text = macro.params;
+				}
+
+				if (macro.type == 'woknoshit') {
+				}
+
+				if (macro.type == 'reklama') {
+					plugin.engine.ads[macro.params.id] = macro.params;
+				}
+
+				if (macro.type == 'event') {
+				}
+
+				if (macro.type == 'separator') {
+				}
+			});
+
+			log('screen_load: loaded');
+			flag('screen', 'loaded');
+
+			if (typeof callback === 'undefined') {
+				log('screen_load: no callback');
+			}
+			else {
+				log(sprintf('screen_load: callback (%s)', callback.toString()));
+				callback();
+			}
+
+			log('screen_load: unlocking, end');
+			unlock('screen_load');
+		});
+
+		log('screen_load: async end');
 	}
 
 
@@ -290,425 +316,28 @@ $.klan.app.browser = function(element, options) {
 		if (force) {
 			log(sprintf('screen_render: rendering%s', force ? ' (forced)' : ''));
 
-			var output = '';
-			var screen = plugin.cache.screens[plugin.actual.screen];
-
-			if (screen.type == '0000000e') {
-				var components = '';
-				var actions = '';
-
-				$.each(screen.components, function(index_component, item_component) {
-					if (item_component.type == 'button') {
-						var image = plugin.cache.images[item_component.image_id]; // TODO
-
-						components += sprintf(
-							'<div id="component-%s-%s" class="component button" style="width:%spx;height:%spx;margin-top:%spx;margin-left:%spx;background-image:url(https://data.klan2016.cz/v1/%s/images/%05d.png);"></div>',
-							screen.id,
-							item_component.id,
-							item_component.geometry.width,
-							item_component.geometry.height,
-							item_component.geometry.y,
-							item_component.geometry.x,
-							plugin.actual.issue,
-							image.id
-						);
-
-						if (item_component.actions && item_component.actions.length) {
-							var action_screen = plugin.actual.screen;
-							var action_text = undefined;
-							var action_type = '';
-							var action_params = [];
-
-							$.each(item_component.actions, function(index_action_item, item_action_item) {
-								if (item_action_item.type == '1') {
-									action_type += ' action-todo';
-								}
-								if (item_action_item.type == 'screen') {
-									action_screen = item_action_item.screen_id;
-									if (action_screen == 65535 && plugin.actual.params.back_screen) {
-										action_screen = plugin.actual.params.back_screen;
-									}
-								}
-								if (item_action_item.type == 'main') {
-									action_text = item_action_item.text_id;
-								}
-								if (item_action_item.type == 'exit') {
-									action_type += ' action-exit';
-								}
-								if (
-									item_action_item.type == 'text' ||
-									item_action_item.type == 'gallery' ||
-									item_action_item.type == 'info' ||
-									item_action_item.type == 'demo'
-								) {
-									action_params.push(sprintf(
-										'%s:%s',
-										item_action_item.type,
-										item_action_item.text_id
-									));
-								}
-								if (
-									item_action_item.type == 'videos_offset' ||
-									item_action_item.type == 'videos_count' ||
-									item_action_item.type == 'videos_images_offset' ||
-									item_action_item.type == 'images_offset' ||
-									item_action_item.type == 'images_count' ||
-									item_action_item.type == 'sounds_offset' ||
-									item_action_item.type == 'sounds_count'
-								) {
-									action_params.push(sprintf(
-										'%s:%s',
-										item_action_item.type,
-										item_action_item.value
-									));
-								}
-							});
-
-							if (action_screen == 14) {
-								action_params.push(sprintf(
-									'%s:%s',
-									'back_screen',
-									screen.id
-								));
-							}
-
-							actions += sprintf(
-								'<div id="action-%s-%s" class="action%s" style="width:%spx;height:%spx;margin-top:%spx;margin-left:%spx;"><a href="#/%s/%s%s%s"></a></div>',
-								screen.id,
-								item_component.id,
-								action_type,
-								item_component.hover.width,
-								item_component.hover.height,
-								item_component.hover.y,
-								item_component.hover.x,
-								plugin.actual.issue,
-								action_screen,
-								(action_text !== undefined) ? sprintf('/%s', action_text) : (action_params.length ? '/-' : ''),
-								action_params.length ? sprintf('/%s', action_params.join('|')) : ''
-							);
-						}
-					}
-
-					if (item_component.type == 'slider') {
-						var image = plugin.cache.images[item_component.image_id]; // TODO
-
-						components += sprintf(
-							'<div id="component-%s-%s" class="component slider" style="width:%spx;height:%spx;margin-top:%spx;margin-left:%spx;background-image:url(https://data.klan2016.cz/v1/%s/images/%05d.png);"></div>',
-							screen.id,
-							item_component.id,
-							item_component.geometry.width,
-							item_component.geometry.height,
-							item_component.geometry.y,
-							item_component.geometry.x,
-							plugin.actual.issue,
-							image.id
-						);
-					}
-
-					if (item_component.type == 'main') {
-						plugin.actual.text = (plugin.actual.text !== undefined) ? plugin.actual.text : item_component.text_id
-
-						components += sprintf(
-							'<div id="component-%s-main" class="component main" style="width:%spx;height:%spx;margin-top:%spx;margin-left:%spx;"></div>',
-							screen.id,
-							item_component.geometry.width + 30,
-							item_component.geometry.height,
-							item_component.geometry.y,
-							item_component.geometry.x
-						);
-						components += sprintf(
-							'<div id="component-%s-main-slider" class="component main-slider" style="height:%spx;margin-top:%spx;margin-left:%spx;"></div>',
-							screen.id,
-							item_component.slider.height,
-							item_component.slider.y,
-							item_component.slider.x
-						);
-					}
-
-					if (item_component.type == 'ad') {
-						var image = plugin.cache.images[item_component.image_id]; // TODO
-
-						components += sprintf(
-							'<div id="component-%s-%s" class="component ad" style="width:%spx;height:%spx;margin-top:%spx;margin-left:%spx;background-image:url(https://data.klan2016.cz/v1/%s/images/%05d.png);"></div>',
-							screen.id,
-							item_component.id,
-							item_component.geometry.width,
-							item_component.geometry.height,
-							item_component.geometry.y,
-							item_component.geometry.x,
-							plugin.actual.issue,
-							image.id
-						);
-
-						if (item_component.actions.length) {
-							$.each(item_component.actions, function(index_action_item, item_action_item) {
-								var action_screen = plugin.actual.screen;
-								var action_text = undefined;
-
-								if (item_action_item.type == 'screen') {
-									action_screen = item_action_item.screen_id;
-								}
-								if (item_action_item.type == 'main') {
-									action_text = item_action_item.text_id;
-								}
-
-								actions += sprintf(
-									'<div id="action-%s-%s" class="action" style="width:%spx;height:%spx;margin-top:%spx;margin-left:%spx;"><a href="#/%s/%s%s"></a></div>',
-									screen.id,
-									item_component.id,
-									item_component.geometry.width,
-									item_component.geometry.height,
-									item_component.geometry.y,
-									item_component.geometry.x,
-									plugin.actual.issue,
-									action_screen,
-									(action_text !== undefined) ? sprintf('/%s', action_text) : ''
-								);
-							});
-						}
-					}
-				});
-
-				output = sprintf(
-					'<div id="screen-%s" class="screen" style="background-image:url(https://data.klan2016.cz/v1/%s/images/%05d.png);">%s%s</div>',
-					screen.id,
+			if (plugin.engine.screen) {
+				$('.screen', plugin.wrappers.screen).css('background-image', sprintf(
+					'url(https://api.klan2016.cz/%s/images/0/%04d.png',
 					plugin.actual.issue,
-					screen.canvas.image_id,
-					components,
-					actions
-				);
+					plugin.engine.screen.id
+				));
 			}
 
-			plugin.wrappers.screen.html(output);
-
-// 			if (screen_x) {
-// 				$.each(screen_x.actions, function(index_action, item_action) {
-// 					var action = '';
-// 					var action_screen = plugin.actual.screen;
-// 					var action_text = undefined;
-// 
-// 					$.each(item_action.items, function(index_action_item, item_action_item) {
-// 						if (item_action_item.type == 4) {
-// 							action_text = item_action_item.text;
-// 							action += sprintf(
-// 								'type: 4, text: %s&#013;',
-// 								item_action_item.text
-// 							);
-// 						}
-// 						else if (item_action_item.type == 9) {
-// 							action += sprintf(
-// 								'type: 9, foo: %s&#013;',
-// 								item_action_item.foo
-// 							);
-// 						}
-// 						else if (item_action_item.type == 11) {
-// 							action += sprintf(
-// 								'type: 11, EXIT&#013;'
-// 							);
-// 						}
-// 						else if (item_action_item.type == 12) {
-// 							action_screen = item_action_item.screen;
-// 							action += sprintf(
-// 								'type: 12, screen: %s&#013;',
-// 								item_action_item.screen
-// 							);
-// 						}
-// 						else if (item_action_item.type == 13) {
-// 							if (item_action_item.foo == 11) {
-// 								action_text = item_action_item.text;
-// 								action += sprintf(
-// 									'type: 13, foo: 11, text: %s&#013;',
-// 									item_action_item.text
-// 								);
-// 							}
-// 						}
-// 						else if (item_action_item.type == 14) {
-// 							action += sprintf(
-// 								'type: 14, foo_1: %s, foo_2: %s&#013;',
-// 								item_action_item.foo_1,
-// 								item_action_item.foo_2
-// 							);
-// 						}
-// 						else {
-// 							action += sprintf(
-// 								'type: %s, UNKNOWN&#013;',
-// 								item_action_item.type
-// 							);
-// 						}
-// 					});
-// 
-// 					if (action) {
-// 						$(sprintf(
-// 							'#component-%s-%s',
-// 							screen_x.header.screen_parent,
-// 							item_action.component
-// 						))
-// 						.append(sprintf(
-// 							'<div id="action-%s-%s" class="action" title="%s"><a href="#/%s/%s%s"></a></div>',
-// 							screen_x.header.screen_parent,
-// 							item_action.component,
-// 							action,
-// 							plugin.actual.issue,
-// 							action_screen,
-// 							(action_text !== undefined) ? sprintf('/%s', action_text) : ''
-// 						));
-// 					}
-// 				});
-// 			}
-
-			$('.action-todo').click(function() {
-				alert('TODO...');
-				return false;
-			});
-
-			$('.action-exit').click(function() {
-				alert('EXIT back to DOS :-)');
-				return false;
-			});
-
-			$.getJSON(sprintf('https://data.klan2016.cz/v1/%s/texts/%s.json', plugin.actual.issue, plugin.actual.text), function(data_text) {
-				var content_display = '';
-
-				$.each(data_text.rows, function(index_row, item_row) {
-					var row = '';
-					var bold_state = false;
-					var italic_state = false;
-					var link_state = false;
-					var font_id = 0;
-					var action_params = [];
-
-					$.each(item_row.tokens, function(index_token, item_token) {
-						if (item_token.type == 'font') {
-							font_id = item_token.value - 1;
-						}
-						if (item_token.type == 'mode') {
-							if (item_token.value == 'bold') {
-								bold_state = item_token.state;
-							}
-							if (item_token.value == 'italic') {
-								italic_state = item_token.state;
-							}
-						}
-						if (item_token.type == 'link') {
-							link_state = item_token.state;
-							if (link_state) {
-								if (item_token.link_type == 14) {
-									$.each(item_token.actions, function(index_action_item, item_action_item) {
-										if (
-											item_action_item.type == 'text' ||
-											item_action_item.type == 'gallery' ||
-											item_action_item.type == 'info' ||
-											item_action_item.type == 'demo'
-										) {
-											action_params.push(sprintf(
-												'%s:%s',
-												item_action_item.type,
-												item_action_item.text_id
-											));
-										}
-										if (
-											item_action_item.type == 'videos_offset' ||
-											item_action_item.type == 'videos_count' ||
-											item_action_item.type == 'videos_images_offset' ||
-											item_action_item.type == 'images_offset' ||
-											item_action_item.type == 'images_count' ||
-											item_action_item.type == 'sounds_offset' ||
-											item_action_item.type == 'sounds_count'
-										) {
-											action_params.push(sprintf(
-												'%s:%s',
-												item_action_item.type,
-												item_action_item.value
-											));
-										}
-									});
-
-									action_params.push(sprintf(
-										'%s:%s',
-										'back_screen',
-										screen.id == 14 ? plugin.actual.params.back_screen : screen.id
-									));
-
-									row += sprintf(
-										'<a href="#/%s/%s%s%s">',
-										plugin.actual.issue,
-										'14',
-										'/-',
-										action_params.length ? sprintf('/%s', action_params.join('|')) : ''
-									);
-								}
-								else if (item_token.link_type == 65518) {
-									row += sprintf(
-										'<a href="#/%s/%s/%s">',
-										plugin.actual.issue,
-										plugin.actual.screen,
-										item_token.actions[0].text_id
-									);
-								}
-								else {
-									row += sprintf(
-										'<a href="#">'
-									);
-								}
-							}
-							else {
-								row += '</a>';
-								action_params = [];
-							}
-						}
-						if (item_token.type == 'space') {
-							row += sprintf(
-								'<span class="space" style="width:%spx;"></span>',
-								item_token.width
-							);
-						}
-						if (item_token.type == 'text') {
-							var text = '';
-							$.each(item_token.characters, function(index_char, item_char) {
-								text += sprintf(
-									'<span class="char-%s"></span>',
-									item_char
-								);
-							});
-							row += sprintf(
-								'<span class="text font-%s%s%s" title="%s">%s</span>',
-								font_id,
-								bold_state ? '-bold' : (italic_state ? '-italic' : ''),
-								link_state ? '-link' : '',
-// 								link ? data_text.links[link_id].type : '',
-								'',
-								text
-							);
-						}
-						if (item_token.type == 'picture') {
-							row += sprintf(
-								'<span class="picture" style="width:%spx;height:%spx;background-image:url(%s)"></span>',
-								item_token.width,
-								item_token.height,
-								item_token.value
-							);
-						}
-					});
-
-					content_display += sprintf(
-						'<div id="row-%s" class="row" style="height:%spx;">%s</div>',
-						index_row,
-						item_row.height,
-						row
-					);
-				});
-
-				$(sprintf(
-					'#component-%s-main',
-					plugin.actual.screen
-				))
-				.html(sprintf(
-					'<div id="content-display" class="content">%s</div>',
-					content_display
+			if (plugin.engine.text) {
+				$('.screen', plugin.wrappers.screen).append(sprintf(
+					'<div id="component-%s-text" class="component text" style="width:%spx;height:%spx;margin-left:%spx;margin-top:%spx;"><img src="https://api.klan2016.cz/%s/texts/0/%03d/0.png" /></div>',
+						plugin.actual.screen,
+						plugin.engine.text.area.width + 30,
+						plugin.engine.text.area.height,
+						plugin.engine.text.area.topleft_x,
+						plugin.engine.text.area.topleft_y,
+						plugin.actual.issue,
+						plugin.cache.texts_indexed[plugin.engine.text.content]
 				));
 
 				$(sprintf(
-					'#component-%s-main',
+					'#component-%s-text',
 					plugin.actual.screen
 				))
 				.mCustomScrollbar({
@@ -727,8 +356,402 @@ $.klan.app.browser = function(element, options) {
 						scrollAmount: 24
 					}
 				});
+			}
+
+			$.each(plugin.engine.buttons, function(button_index, button) {
+				var image = plugin.cache.images[button.image];
+
+				$('.screen', plugin.wrappers.screen).append(sprintf(
+					'<div id="component-%s-%s" class="component button" style="width:%spx;height:%spx;margin-left:%spx;margin-top:%spx;background-image:url(https://api.klan2016.cz/%s/images/0/%04d.png);"></div>',
+					plugin.actual.screen,
+					button.id,
+					image.width,
+					image.height,
+					button.topleft_x,
+					button.topleft_y,
+					plugin.actual.issue,
+					button.image
+				));
+			});
+
+			$.each(plugin.engine.ads, function(ad_index, ad) {
+				var image = plugin.cache.images[ad.image];
+
+				$('.screen', plugin.wrappers.screen).append(sprintf(
+					'<div id="component-%s-%s" class="component ad" style="width:%spx;height:%spx;margin-left:%spx;margin-top:%spx;background-image:url(https://api.klan2016.cz/%s/images/0/%04d.png);"></div>',
+					plugin.actual.screen,
+					ad.id,
+					image.width,
+					image.height,
+					ad.topleft_x,
+					ad.topleft_y,
+					plugin.actual.issue,
+					ad.image
+				));
 			});
 		}
+
+// 			if (screen.type == '0000000e') {
+// 				var components = '';
+// 				var actions = '';
+// 
+// 				$.each(screen.components, function(index_component, item_component) {
+// 					if (item_component.type == 'button') {
+// 						var image = plugin.cache.images[item_component.image_id]; // TODO
+// 
+// 						components += sprintf(
+// 							'<div id="component-%s-%s" class="component button" style="width:%spx;height:%spx;margin-top:%spx;margin-left:%spx;background-image:url(https://data.klan2016.cz/v1/%s/images/%05d.png);"></div>',
+// 							screen.id,
+// 							item_component.id,
+// 							item_component.geometry.width,
+// 							item_component.geometry.height,
+// 							item_component.geometry.y,
+// 							item_component.geometry.x,
+// 							plugin.actual.issue,
+// 							image.id
+// 						);
+// 
+// 						if (item_component.actions && item_component.actions.length) {
+// 							var action_screen = plugin.actual.screen;
+// 							var action_text = undefined;
+// 							var action_type = '';
+// 							var action_params = [];
+// 
+// 							$.each(item_component.actions, function(index_action_item, item_action_item) {
+// 								if (item_action_item.type == '1') {
+// 									action_type += ' action-todo';
+// 								}
+// 								if (item_action_item.type == 'screen') {
+// 									action_screen = item_action_item.screen_id;
+// 									if (action_screen == 65535 && plugin.actual.params.back_screen) {
+// 										action_screen = plugin.actual.params.back_screen;
+// 									}
+// 								}
+// 								if (item_action_item.type == 'main') {
+// 									action_text = item_action_item.text_id;
+// 								}
+// 								if (item_action_item.type == 'exit') {
+// 									action_type += ' action-exit';
+// 								}
+// 								if (
+// 									item_action_item.type == 'text' ||
+// 									item_action_item.type == 'gallery' ||
+// 									item_action_item.type == 'info' ||
+// 									item_action_item.type == 'demo'
+// 								) {
+// 									action_params.push(sprintf(
+// 										'%s:%s',
+// 										item_action_item.type,
+// 										item_action_item.text_id
+// 									));
+// 								}
+// 								if (
+// 									item_action_item.type == 'videos_offset' ||
+// 									item_action_item.type == 'videos_count' ||
+// 									item_action_item.type == 'videos_images_offset' ||
+// 									item_action_item.type == 'images_offset' ||
+// 									item_action_item.type == 'images_count' ||
+// 									item_action_item.type == 'sounds_offset' ||
+// 									item_action_item.type == 'sounds_count'
+// 								) {
+// 									action_params.push(sprintf(
+// 										'%s:%s',
+// 										item_action_item.type,
+// 										item_action_item.value
+// 									));
+// 								}
+// 							});
+// 
+// 							if (action_screen == 14) {
+// 								action_params.push(sprintf(
+// 									'%s:%s',
+// 									'back_screen',
+// 									screen.id
+// 								));
+// 							}
+// 
+// 							actions += sprintf(
+// 								'<div id="action-%s-%s" class="action%s" style="width:%spx;height:%spx;margin-top:%spx;margin-left:%spx;"><a href="#/%s/%s%s%s"></a></div>',
+// 								screen.id,
+// 								item_component.id,
+// 								action_type,
+// 								item_component.hover.width,
+// 								item_component.hover.height,
+// 								item_component.hover.y,
+// 								item_component.hover.x,
+// 								plugin.actual.issue,
+// 								action_screen,
+// 								(action_text !== undefined) ? sprintf('/%s', action_text) : (action_params.length ? '/-' : ''),
+// 								action_params.length ? sprintf('/%s', action_params.join('|')) : ''
+// 							);
+// 						}
+// 					}
+// 
+// 					if (item_component.type == 'slider') {
+// 						var image = plugin.cache.images[item_component.image_id]; // TODO
+// 
+// 						components += sprintf(
+// 							'<div id="component-%s-%s" class="component slider" style="width:%spx;height:%spx;margin-top:%spx;margin-left:%spx;background-image:url(https://data.klan2016.cz/v1/%s/images/%05d.png);"></div>',
+// 							screen.id,
+// 							item_component.id,
+// 							item_component.geometry.width,
+// 							item_component.geometry.height,
+// 							item_component.geometry.y,
+// 							item_component.geometry.x,
+// 							plugin.actual.issue,
+// 							image.id
+// 						);
+// 					}
+// 
+// 					if (item_component.type == 'main') {
+// 						plugin.actual.text = (plugin.actual.text !== undefined) ? plugin.actual.text : item_component.text_id
+// 
+// 						components += sprintf(
+// 							'<div id="component-%s-main" class="component main" style="width:%spx;height:%spx;margin-top:%spx;margin-left:%spx;"></div>',
+// 							screen.id,
+// 							item_component.geometry.width + 30,
+// 							item_component.geometry.height,
+// 							item_component.geometry.y,
+// 							item_component.geometry.x
+// 						);
+// 						components += sprintf(
+// 							'<div id="component-%s-main-slider" class="component main-slider" style="height:%spx;margin-top:%spx;margin-left:%spx;"></div>',
+// 							screen.id,
+// 							item_component.slider.height,
+// 							item_component.slider.y,
+// 							item_component.slider.x
+// 						);
+// 					}
+// 
+// 					if (item_component.type == 'ad') {
+// 						var image = plugin.cache.images[item_component.image_id]; // TODO
+// 
+// 						components += sprintf(
+// 							'<div id="component-%s-%s" class="component ad" style="width:%spx;height:%spx;margin-top:%spx;margin-left:%spx;background-image:url(https://data.klan2016.cz/v1/%s/images/%05d.png);"></div>',
+// 							screen.id,
+// 							item_component.id,
+// 							item_component.geometry.width,
+// 							item_component.geometry.height,
+// 							item_component.geometry.y,
+// 							item_component.geometry.x,
+// 							plugin.actual.issue,
+// 							image.id
+// 						);
+// 
+// 						if (item_component.actions.length) {
+// 							$.each(item_component.actions, function(index_action_item, item_action_item) {
+// 								var action_screen = plugin.actual.screen;
+// 								var action_text = undefined;
+// 
+// 								if (item_action_item.type == 'screen') {
+// 									action_screen = item_action_item.screen_id;
+// 								}
+// 								if (item_action_item.type == 'main') {
+// 									action_text = item_action_item.text_id;
+// 								}
+// 
+// 								actions += sprintf(
+// 									'<div id="action-%s-%s" class="action" style="width:%spx;height:%spx;margin-top:%spx;margin-left:%spx;"><a href="#/%s/%s%s"></a></div>',
+// 									screen.id,
+// 									item_component.id,
+// 									item_component.geometry.width,
+// 									item_component.geometry.height,
+// 									item_component.geometry.y,
+// 									item_component.geometry.x,
+// 									plugin.actual.issue,
+// 									action_screen,
+// 									(action_text !== undefined) ? sprintf('/%s', action_text) : ''
+// 								);
+// 							});
+// 						}
+// 					}
+// 				});
+// 
+// 				output = sprintf(
+// 					'<div id="screen-%s" class="screen" style="background-image:url(https://data.klan2016.cz/v1/%s/images/%05d.png);">%s%s</div>',
+// 					screen.id,
+// 					plugin.actual.issue,
+// 					screen.canvas.image_id,
+// 					components,
+// 					actions
+// 				);
+// 			}
+
+// 			plugin.wrappers.screen.html(output);
+
+// 			$('.action-todo').click(function() {
+// 				alert('TODO...');
+// 				return false;
+// 			});
+// 
+// 			$('.action-exit').click(function() {
+// 				alert('EXIT back to DOS :-)');
+// 				return false;
+// 			});
+// 
+// 			$.getJSON(sprintf('https://data.klan2016.cz/v1/%s/texts/%s.json', plugin.actual.issue, plugin.actual.text), function(data_text) {
+// 				var content_display = '';
+// 
+// 				$.each(data_text.rows, function(index_row, item_row) {
+// 					var row = '';
+// 					var bold_state = false;
+// 					var italic_state = false;
+// 					var link_state = false;
+// 					var font_id = 0;
+// 					var action_params = [];
+// 
+// 					$.each(item_row.tokens, function(index_token, item_token) {
+// 						if (item_token.type == 'font') {
+// 							font_id = item_token.value - 1;
+// 						}
+// 						if (item_token.type == 'mode') {
+// 							if (item_token.value == 'bold') {
+// 								bold_state = item_token.state;
+// 							}
+// 							if (item_token.value == 'italic') {
+// 								italic_state = item_token.state;
+// 							}
+// 						}
+// 						if (item_token.type == 'link') {
+// 							link_state = item_token.state;
+// 							if (link_state) {
+// 								if (item_token.link_type == 14) {
+// 									$.each(item_token.actions, function(index_action_item, item_action_item) {
+// 										if (
+// 											item_action_item.type == 'text' ||
+// 											item_action_item.type == 'gallery' ||
+// 											item_action_item.type == 'info' ||
+// 											item_action_item.type == 'demo'
+// 										) {
+// 											action_params.push(sprintf(
+// 												'%s:%s',
+// 												item_action_item.type,
+// 												item_action_item.text_id
+// 											));
+// 										}
+// 										if (
+// 											item_action_item.type == 'videos_offset' ||
+// 											item_action_item.type == 'videos_count' ||
+// 											item_action_item.type == 'videos_images_offset' ||
+// 											item_action_item.type == 'images_offset' ||
+// 											item_action_item.type == 'images_count' ||
+// 											item_action_item.type == 'sounds_offset' ||
+// 											item_action_item.type == 'sounds_count'
+// 										) {
+// 											action_params.push(sprintf(
+// 												'%s:%s',
+// 												item_action_item.type,
+// 												item_action_item.value
+// 											));
+// 										}
+// 									});
+// 
+// 									action_params.push(sprintf(
+// 										'%s:%s',
+// 										'back_screen',
+// 										screen.id == 14 ? plugin.actual.params.back_screen : screen.id
+// 									));
+// 
+// 									row += sprintf(
+// 										'<a href="#/%s/%s%s%s">',
+// 										plugin.actual.issue,
+// 										'14',
+// 										'/-',
+// 										action_params.length ? sprintf('/%s', action_params.join('|')) : ''
+// 									);
+// 								}
+// 								else if (item_token.link_type == 65518) {
+// 									row += sprintf(
+// 										'<a href="#/%s/%s/%s">',
+// 										plugin.actual.issue,
+// 										plugin.actual.screen,
+// 										item_token.actions[0].text_id
+// 									);
+// 								}
+// 								else {
+// 									row += sprintf(
+// 										'<a href="#">'
+// 									);
+// 								}
+// 							}
+// 							else {
+// 								row += '</a>';
+// 								action_params = [];
+// 							}
+// 						}
+// 						if (item_token.type == 'space') {
+// 							row += sprintf(
+// 								'<span class="space" style="width:%spx;"></span>',
+// 								item_token.width
+// 							);
+// 						}
+// 						if (item_token.type == 'text') {
+// 							var text = '';
+// 							$.each(item_token.characters, function(index_char, item_char) {
+// 								text += sprintf(
+// 									'<span class="char-%s"></span>',
+// 									item_char
+// 								);
+// 							});
+// 							row += sprintf(
+// 								'<span class="text font-%s%s%s" title="%s">%s</span>',
+// 								font_id,
+// 								bold_state ? '-bold' : (italic_state ? '-italic' : ''),
+// 								link_state ? '-link' : '',
+// // 								link ? data_text.links[link_id].type : '',
+// 								'',
+// 								text
+// 							);
+// 						}
+// 						if (item_token.type == 'picture') {
+// 							row += sprintf(
+// 								'<span class="picture" style="width:%spx;height:%spx;background-image:url(%s)"></span>',
+// 								item_token.width,
+// 								item_token.height,
+// 								item_token.value
+// 							);
+// 						}
+// 					});
+// 
+// 					content_display += sprintf(
+// 						'<div id="row-%s" class="row" style="height:%spx;">%s</div>',
+// 						index_row,
+// 						item_row.height,
+// 						row
+// 					);
+// 				});
+// 
+// 				$(sprintf(
+// 					'#component-%s-main',
+// 					plugin.actual.screen
+// 				))
+// 				.html(sprintf(
+// 					'<div id="content-display" class="content">%s</div>',
+// 					content_display
+// 				));
+// 
+// 				$(sprintf(
+// 					'#component-%s-main',
+// 					plugin.actual.screen
+// 				))
+// 				.mCustomScrollbar({
+// 					scrollInertia: 0,
+// 					snapAmount: 12,
+// 					mouseWheel: {
+// 						enable: true,
+// 						scrollAmount: 24
+// 					},
+// 					scrollButtons: {
+// 						enable: false,
+// 						scrollAmount: 24
+// 					},
+// 					keyboard: {
+// 						enable: true,
+// 						scrollAmount: 24
+// 					}
+// 				});
+// 			});
+// 		}
 
 		log('screen_render: unlocking, end');
 		unlock('screen_render');
@@ -785,47 +808,6 @@ $.klan.app.browser = function(element, options) {
 
 
 	// ******************************************* helpers *******************************************
-	var trim_smart = function(text, limit) {
-		if (text.length > limit) {
-			return $.trim(text)
-			.substring(0, limit)
-			.split(' ')
-			.slice(0, -1)
-			.join(' ')
-			+ '...';
-		}
-		else {
-			return text;
-		}
-	}
-
-	var shorten = function(text, limit, readmore, readless) {
-		var readmore = typeof readmore !== 'undefined' ? readmore : 'více';
-		var readless = typeof readless !== 'undefined' ? readless : 'méně';
-
-		if (text.length > limit) {
-			text_prefix = $.trim(text)
-				.substring(0, limit)
-				.split(' ')
-				.slice(0, -1)
-				.join(' ');
-			text_suffix = $.trim(
-				$.trim(text)
-					.substring(text_prefix.length)
-			);
-
-			return sprintf(
-				'%s<span class="readmore-break">... </span><span class="readmore">%s</span><span class="suffix"> %s</span><span class="readless-break"> </span><span class="readless">%s</span>',
-				text_prefix,
-				readmore,
-				text_suffix,
-				readless
-			);
-		}
-		else {
-			return text;
-		}
-	}
 
 
 
