@@ -95,65 +95,55 @@ p a {
 
 #shell {
 	width: 640px;
-	margin: 0 auto;
+	margin: 50px auto;
 }
 
-.screen {
+.wrapper-display {
+	position: relative;
 	width: 640px;
 	height: 480px;
-	margin-top: 40px;
-	background-color: black;
+	overflow: hidden
 }
 
-.screen .component,
-.screen .action {
+.wrapper-display .screen {
+	width: 640px;
+	height: 480px;
+}
+
+.wrapper-display .component,
+.wrapper-display .action {
 	position: absolute;
 	background-repeat: no-repeat;
 }
 
-.screen .action {
+.wrapper-display .component {
 	z-index: 100;
 }
 
-body.debug .screen .button {
-	background-color: red;
+.wrapper-display .action {
+	z-index: 200;
+	display: block;
+	width: 100%;
+	height: 100%;
 }
 
-body.debug .screen .slider {
-	background-color: green;
-}
-
-.screen .text {
+.wrapper-display .text {
 	overflow: hidden;
 }
 
-.screen .text .row span,
-.screen .text .row a {
-	height: inherit;
-	display: inline-block;
-	vertical-align: top;
+body.debug .wrapper-display .button {
+	background-color: red;
 }
 
-body.debug .screen .text .link {
-	outline: 1px solid red;
-	cursor: pointer;
-	cursor: hand;
+body.debug .wrapper-display .slider {
+	background-color: green;
 }
 
-.screen .text .picture {
-	vertical-align: text-top;
-}
-
-.screen .text-slider {
-	width: 1px;
-/* 	background-color: gray; */
-}
-
-body.debug .screen .ad {
+body.debug .wrapper-display .ad {
 	background-color: blue;
 }
 
-body.debug .screen .action {
+body.debug .wrapper-display .action {
 	display: block;
 	width: 100%;
 	height: 100%;
@@ -163,12 +153,6 @@ body.debug .screen .action {
 	color: red;
 	font-size: 12px;
 	font-weight: bold;
-}
-
-.screen .action a {
-	display: block;
-	width: 100%;
-	height: 100%;
 }
 
 .mCSB_scrollTools {
