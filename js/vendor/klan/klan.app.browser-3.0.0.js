@@ -27,32 +27,32 @@ $.klan.app.browser = function(element, options) {
 	plugin.locks = {}
 	plugin.flags = {}
 	plugin.engine = {
+		'ads': {},
+		'buttons': {},
 		'events': {},
 		'ivars': {},
-		'svars': {},
 		'screen': null,
-		'buttons': {},
-		'ads': {},
+		'svars': {},
 		'text': null
 	}
 
 	plugin.init = function() {
-		log('init: begin');
-
 		plugin.settings = $.extend({}, defaults, options);
 
 		if ($.query.get('debug')) {
 			$('body').addClass('debug');
 		}
 
-		log('init: issue/images, issue/screens, issue/texts async call');
-		$.when.all([
-			$.klan.api.issue.images(plugin.settings.issue),
-			$.klan.api.issue.screens(plugin.settings.issue),
-			$.klan.api.issue.texts(plugin.settings.issue)
-		]).done(function(responses) {
-			log('init: issue/images, issue/screens, issue/texts async response');
+		plugin.actual.issue = plugin.settings.issue;
+		plugin.actual.screen = plugin.settings.screen;
+		plugin.actual.text = plugin.settings.text;
+		plugin.actual.params = plugin.settings.params;
 
+		$.when.all([
+			$.klan.api.issue.images(plugin.actual.issue),
+			$.klan.api.issue.screens(plugin.actual.issue),
+			$.klan.api.issue.texts(plugin.actual.issue)
+		]).done(function(responses) {
 			plugin.cache.images = responses[0].images;
 			plugin.cache.screens = responses[1].screens;
 			plugin.cache.texts = responses[2].texts;
@@ -62,14 +62,7 @@ $.klan.app.browser = function(element, options) {
 				plugin.cache.texts_indexed[text.name.replace('/', '\\')] = text_index;
 			});
 
-			plugin.actual.issue = plugin.settings.issue;
-			plugin.actual.screen = plugin.settings.screen;
-			plugin.actual.text = plugin.settings.text;
-			plugin.actual.params = plugin.settings.params;
-
 			crossroads.addRoute('/{issue}/{screen}/:text:/:params_raw:', function(issue, screen, text, params_raw) {
-				log(sprintf('crossroads: parse (issue="%s", screen="%s", text="%s", params_raw="%s")', issue, screen, text, params_raw));
-
 				plugin.actual.issue = issue;
 				plugin.actual.screen = parseInt(screen);
 				plugin.actual.text = (text && text != '-') ? text : undefined;
@@ -99,8 +92,6 @@ $.klan.app.browser = function(element, options) {
 			});
 
 			crossroads.addRoute('/{issue}', function(issue) {
-				log(sprintf('crossroads: parse (issue="%s")', issue));
-
 				plugin.actual.issue = issue;
 				plugin.actual.screen = 1;
 
@@ -108,8 +99,6 @@ $.klan.app.browser = function(element, options) {
 			});
 
 			function hasher_init(hash_current) {
-				log(sprintf('hasher: init (hash="%s")', hash_current));
-
 				if (hash_current == '') {
 					hasher.replaceHash(plugin.actual.issue);
 				}
@@ -119,57 +108,50 @@ $.klan.app.browser = function(element, options) {
 			}
 
 			function hasher_parse(hash_new, hash_old) {
-				log(sprintf('hasher: change ("%s"=>"%s")', hash_old, hash_new));
-
 				crossroads.parse(hash_new);
 			}
 
 			wrappers_prepare();
 			screen_prepare();
+			info_prepare();
 
 			hasher.initialized.add(hasher_init);
 			hasher.changed.add(hasher_parse);
 			hasher.init();
 		});
-
-		log('init: end');
 	}
 
 
 
 // ******************************************* wrappers *******************************************
 	var wrappers_prepare = function(callback) {
-		log('wrappers_prepare: begin');
-
 		if (locked('wrappers_prepare')) {
-			log('wrappers_prepare: locked, end');
 			return false;
 		}
 
-		log('wrappers_prepare: locking');
 		lock('wrappers_prepare');
 
 		$element.html(sprintf(
-			'<div class="klan-app-browser klan-issue-%s klan-clearfix">' +
-				'<div class="wrapper-display cro-clearfix"></div>' +
+			'<div class="klan-app-browser klan-issue-%s clearfix">' +
+				'<div class="wrapper-display"></div>' +
+				'<div class="wrapper-info"></div>' +
+				'<div class="wrapper-log"></div>' +
 			'</div>',
 			plugin.actual.issue
 		));
 
 		plugin.wrappers.display = $('.wrapper-display', $element);
+		plugin.wrappers.info = $('.wrapper-info', $element);
+		plugin.wrappers.log = $('.wrapper-log', $element);
 
-		log('wrappers_prepare: prepared');
 		flag('wrappers', 'prepared');
 
 		if (typeof callback === 'undefined') {
-			log('wrappers_prepare: no callback');
 		}
 		else {
-			log(sprintf('wrappers_prepare: callback (%s)', callback.toString()));
 			callback();
 		}
 
-		log('wrappers_prepare: unlocking, end');
 		unlock('wrappers_prepare');
 	}
 
@@ -177,124 +159,62 @@ $.klan.app.browser = function(element, options) {
 
 	// ******************************************* screen *******************************************
 	var screen_prepare = function(callback) {
-		log('screen_prepare: begin');
-
 		if (locked('screen_prepare')) {
-			log('screen_prepare: locked, end');
 			return false;
 		}
 
 		if (!flagged('wrappers', 'prepared')) {
-			log('screen_prepare: wrappers not prepared, end');
 			return false;
 		}
 
-		log('screen_prepare: locking');
 		lock('screen_prepare');
 
-		log('screen_prepare: prepared');
 		flag('screen', 'prepared');
 
 		if (typeof callback === 'undefined') {
-			log('screen_prepare: no callback');
 		}
 		else {
-			log(sprintf('screen_prepare: callback (%s)', callback.toString()));
 			callback();
 		}
 
-		log('screen_prepare: unlocking, end');
 		unlock('screen_prepare');
 	}
 
 
 
 	var screen_load = function() {
-		log('screen_load: begin');
+		log(' - - loading');
 
-		if (locked('screen_load')) {
-			log('screen_load: locked, end');
-			return false;
-		}
-
-		if (!flagged('screen', 'prepared')) {
-			log('screen_load: screen not prepared, end');
-			return false;
-		}
-
-		log('screen_load: locking');
-		lock('screen_load');
-
-		unflag('screen', 'loaded');
-
-		log('screen_load: issue/screens/id async call');
 		$.when.all([
 			$.klan.api.issue.screens(plugin.actual.issue, plugin.actual.screen)
 		]).done(function(responses) {
-			log('screen_load: issue/screens/id async response');
 			plugin.cache.screen = responses[0];
 
-			log('screen_load: loaded');
-			flag('screen', 'loaded');
-
-			log('screen_load: unlocking, end');
-			unlock('screen_load');
-
 			if (plugin.cache.screen.type_1 == 0) {
-				plugin.engine = {
-					'events': {},
-					'ivars': {},
-					'svars': {},
-					'screen': null,
-					'buttons': {},
-					'ads': {},
-					'text': null
-				}
+				plugin.engine.events = {};
+				plugin.engine.screen = null;
+				plugin.engine.buttons = {};
+				plugin.engine.ads = {};
+				plugin.engine.text = null;
 			}
 
 			$.each(plugin.cache.screen.events, function(event_index, event) {
-				log(sprintf('event set: %s', event.binding));
 				plugin.engine.events[event.binding] = event.macros;
 			});
 
 			$.each(plugin.cache.screen.macros, function(macro_index, macro) {
-				parse_macro(macro);
+				parse_macro(macro, macro_index);
 			});
-
-// 			if (typeof callback === 'undefined') {
-// 				log('screen_load: no callback');
-// 			}
-// 			else {
-// 				log(sprintf('screen_load: callback (%s)', callback.toString()));
-// 				callback();
-// 			}
 		});
-
-		log('screen_load: async end');
 	}
 
 
 
 	var screen_render = function(force) {
-		log('screen_render: begin');
-
-		if (locked('screen_render')) {
-			log('screen_render: locked, end');
-			return false;
-		}
-
-		if (!flagged('screen', 'loaded')) {
-			log('screen_render: screen not loaded, end');
-			return false;
-		}
-
-		log('screen_render: locking');
-		lock('screen_render');
-
 		force = (typeof force === 'undefined') ? false : force;
 
 		if (force) {
-			log(sprintf('screen_render: rendering%s', force ? ' (forced)' : ''));
+			log(' - - rendering');
 
 			plugin.wrappers.display.empty();
 
@@ -315,7 +235,9 @@ $.klan.app.browser = function(element, options) {
 					plugin.engine.text.area.topleft_x,
 					plugin.engine.text.area.topleft_y,
 					plugin.actual.issue,
-					plugin.cache.texts_indexed[plugin.engine.text.content]
+					plugin.engine.text.content.startsWith('^') ?
+						plugin.cache.texts_indexed[plugin.engine.svars[plugin.engine.text.content.substr(1)]] :
+						plugin.cache.texts_indexed[plugin.engine.text.content]
 				));
 
 				$(sprintf(
@@ -356,16 +278,30 @@ $.klan.app.browser = function(element, options) {
 					button.image
 				));
 
-				plugin.wrappers.display.append(sprintf(
-					'<div id="action-%s-%s" data-id="%s" class="action" style="width:%spx;height:%spx;left:%spx;top:%spx;"></div>',
-					plugin.actual.screen,
-					button.id,
-					button.id,
-					image.width,
-					image.height,
-					button.topleft_x,
-					button.topleft_y
-				));
+				if (button.hover_topleft_x || button.hover_topleft_y || button.hover_bottomright_x || button.hover_bottomright_y) {
+					plugin.wrappers.display.append(sprintf(
+						'<div id="action-%s-%s" data-id="%s" class="action" style="width:%spx;height:%spx;left:%spx;top:%spx;"></div>',
+						plugin.actual.screen,
+						button.id,
+						button.id,
+						button.hover_bottomright_x - button.hover_topleft_x,
+						button.hover_bottomright_y - button.hover_topleft_y,
+						button.hover_topleft_x,
+						button.hover_topleft_y
+					));
+				}
+				else {
+					plugin.wrappers.display.append(sprintf(
+						'<div id="action-%s-%s" data-id="%s" class="action" style="width:%spx;height:%spx;left:%spx;top:%spx;"></div>',
+						plugin.actual.screen,
+						button.id,
+						button.id,
+						image.width,
+						image.height,
+						button.topleft_x,
+						button.topleft_y
+					));
+				}
 			});
 
 			$.each(plugin.engine.ads, function(ad_index, ad) {
@@ -397,17 +333,61 @@ $.klan.app.browser = function(element, options) {
 		}
 
 		$('.action').click(function() {
-			$.each(plugin.engine.events[$(this).data('id')], function(event_macro_index, event_macro) {
-				parse_macro(event_macro);
-			});
-
+			run_event($(this).data('id'));
 			screen_render(true);
 
 			return false;
 		});
+	}
 
-		log('screen_render: unlocking, end');
-		unlock('screen_render');
+
+
+	// ******************************************* info *******************************************
+	var info_prepare = function() {
+	}
+
+
+
+	var info_render = function() {
+		plugin.wrappers.info.empty();
+
+		plugin.wrappers.info.append(sprintf(
+			'<div>- ivars</div>'
+		));
+		$.each(plugin.engine.ivars, function(ivar_index, ivar) {
+			plugin.wrappers.info.append(sprintf(
+				'<div>ivar %s = %s</div>',
+				ivar_index,
+				ivar
+			));
+		});
+
+		plugin.wrappers.info.append(sprintf(
+			'<div>- svars</div>'
+		));
+		$.each(plugin.engine.svars, function(svar_index, svar) {
+			plugin.wrappers.info.append(sprintf(
+				'<div>svar %s = "%s"</div>',
+				svar_index,
+				svar
+			));
+		});
+
+		plugin.wrappers.info.append(sprintf(
+			'<div>- screen</div>'
+		));
+		plugin.wrappers.info.append(sprintf(
+			'<div>screen = %s</div>',
+			plugin.engine.screen ? plugin.engine.screen.id : 'null'
+		));
+
+		plugin.wrappers.info.append(sprintf(
+			'<div>- text</div>'
+		));
+		plugin.wrappers.info.append(sprintf(
+			'<div>text = %s</div>',
+			plugin.engine.text ? plugin.engine.text.content : 'null'
+		));
 	}
 
 
@@ -415,6 +395,9 @@ $.klan.app.browser = function(element, options) {
 	// ******************************************* logging *******************************************
 	var log = function(string) {
 		$.klan.log(sprintf('[%s] %s', plugin.meta.name, string));
+		if (plugin.wrappers.log) {
+			plugin.wrappers.log.prepend(sprintf('<div>- %s</div>', string));
+		}
 	}
 
 
@@ -461,8 +444,9 @@ $.klan.app.browser = function(element, options) {
 
 
 	// ******************************************* helpers *******************************************
-	var parse_macro = function(macro) {
-		log(sprintf('parse_macro: %s', macro.type));
+	var parse_macro = function(macro, macro_index) {
+		log(sprintf('s: %s, m: %s, t: %s', plugin.actual.screen, macro_index, macro.type));
+
 		if (macro.type == 'button') {
 			if (macro.params.id < 32768) {
 				plugin.engine.buttons[macro.params.id] = macro.params;
@@ -470,14 +454,47 @@ $.klan.app.browser = function(element, options) {
 		}
 
 		if (macro.type == 'event') {
-			$.each(plugin.engine.events[macro.params.id], function(event_macro_index, event_macro) {
-				parse_macro(event_macro);
-			});
+			run_event(macro.params.id);
 		}
 
 		if (macro.type == 'gotopage') {
-			plugin.actual.screen = macro.params.id;
+			if (macro.params.id < 32768) {
+				plugin.actual.screen = macro.params.id;
+			}
+			else {
+				plugin.actual.screen = plugin.engine.ivars[65536 - macro.params.id];
+			}
 			screen_load();
+		}
+
+		if (macro.type == 'if') {
+			var value_1 = null;
+			var value_2 = null;
+			var condition = null;
+
+			if (macro.params.branches.branch_if.value_1 < 32768) {
+				// TODO ???
+			}
+			else {
+				value_1 = plugin.engine.ivars[65536 - macro.params.id]
+			}
+
+			value_2 = macro.params.branches.branch_if.value_2;
+
+			if (macro.params.branches.branch_if.condition == 1) {
+				condition = (value_1 == value_2);
+			}
+
+			if (condition) {
+				$.each(macro.params.branches.branch_if.macros, function(branch_macro_index, branch_macro) {
+					parse_macro(branch_macro, branch_macro_index);
+				});
+			}
+			else if (macro.params.branches.branch_else) {
+				$.each(macro.params.branches.branch_else.macros, function(branch_macro_index, branch_macro) {
+					parse_macro(branch_macro, branch_macro_index);
+				});
+			}
 		}
 
 		if (macro.type == 'ivar/mov') {
@@ -500,6 +517,10 @@ $.klan.app.browser = function(element, options) {
 			// PASS
 		}
 
+		if (macro.type == 'svar') {
+			plugin.engine.svars[macro.params.variable] = macro.params.value;
+		}
+
 		if (macro.type == 'text') {
 			plugin.engine.text = macro.params;
 		}
@@ -507,11 +528,26 @@ $.klan.app.browser = function(element, options) {
 		if (macro.type == 'woknoshit') {
 			screen_render(true);
 		}
+
+		info_render();
 	}
 
 
 
-	log(sprintf('version: %s', plugin.meta.version));
+	var run_event = function(event_id) {
+		log(sprintf(' - - event %s'), event_id);
+
+		if (event_id) {
+			$.each(plugin.engine.events[event_id], function(event_macro_index, event_macro) {
+				parse_macro(event_macro, event_macro_index);
+			});
+		}
+		else {
+			alert('Exit to DOS :-)');
+		}
+	}
+
+
 	plugin.init();
 }
 
