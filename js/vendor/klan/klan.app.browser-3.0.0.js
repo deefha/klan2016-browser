@@ -337,7 +337,8 @@ $.klan.app.browser = function(element, options) {
 		));
 		$.each(plugin.engine.events, function(event_index, event) {
 			plugin.wrappers.info.append(sprintf(
-				'<div>event %s = %s</div>',
+				'<div><span class="info-event-toggle" data-id="%s">event %s = %s</span></div>',
+				event_index,
 				event_index,
 				event
 			));
@@ -347,8 +348,13 @@ $.klan.app.browser = function(element, options) {
 			));
 			$(sprintf('.info-event-%s', event_index)).JSONView(
 				JSON.stringify(event),
-				{ 'collapsed': true }
+				{ 'collapsed': true, 'recursive_collapser': true }
 			);
+		});
+		$('.info-event-toggle').click(function() {
+			$(sprintf('.info-event-%s', $(this).data('id'))).JSONView('toggle');
+
+			return false;
 		});
 	}
 
