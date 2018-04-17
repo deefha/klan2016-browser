@@ -41,68 +41,63 @@ $.klan.app.browser = function(element, options) {
 		}
 
 		plugin.actual.issue = plugin.settings.issue;
-		plugin.actual.screen = plugin.settings.screen;
 
-		$.when.all([
-			$.klan.api.issue.images(plugin.actual.issue),
-			$.klan.api.issue.screens(plugin.actual.issue),
-			$.klan.api.issue.texts(plugin.actual.issue)
-		]).done(function(responses) {
-			plugin.cache.images = responses[0].images;
-			plugin.cache.screens = responses[1].screens;
-			plugin.cache.texts = responses[2].texts;
+		crossroads.addRoute('/{issue}', function(issue) {
+			plugin.actual.issue = issue;
+			plugin.actual.screen = 1;
 
-			plugin.cache.texts_indexed = {}
-			$.each(plugin.cache.texts, function(text_index, text) {
-				plugin.cache.texts_indexed[text.name.replace('/', '\\')] = text_index;
-			});
+			$.when.all([
+				$.klan.api.issue.images(plugin.actual.issue),
+				$.klan.api.issue.screens(plugin.actual.issue),
+				$.klan.api.issue.texts(plugin.actual.issue)
+			]).done(function(responses) {
+				plugin.cache.images = responses[0].images;
+				plugin.cache.screens = responses[1].screens;
+				plugin.cache.texts = responses[2].texts;
 
-			crossroads.addRoute('/{issue}', function(issue) {
-				plugin.actual.issue = issue;
-				plugin.actual.screen = 1;
+				plugin.cache.texts_indexed = {}
+				$.each(plugin.cache.texts, function(text_index, text) {
+					plugin.cache.texts_indexed[text.name.replace('/', '\\')] = text_index;
+				});
+
+				plugin.engine = {
+					'ads': {},
+					'buttons': {},
+					'events': {},
+					'ivars': {},
+					'screen': null,
+					'svars': {},
+					'text': null
+				}
 
 				screen_load();
-
-	// 				log('crossroads: starting loop');
-	// 				$(document).everyTime(5500, 'klan.app.browser.loop', function() {
-	// 					log('* loop tick');
-	// //					listing_render(); // TODO?
-	// 				});
 			});
-
-			function hasher_init(hash_current) {
-				if (hash_current == '') {
-					hasher.replaceHash(plugin.actual.issue);
-				}
-				else {
-					crossroads.parse(hash_current);
-				}
-			}
-
-			function hasher_parse(hash_new, hash_old) {
-				crossroads.parse(hash_new);
-			}
-
-			wrappers_prepare();
-			screen_prepare();
-			info_prepare();
-
-			hasher.initialized.add(hasher_init);
-			hasher.changed.add(hasher_parse);
-			hasher.init();
 		});
+
+		function hasher_init(hash_current) {
+			if (hash_current == '') {
+				hasher.replaceHash(plugin.actual.issue);
+			}
+			else {
+				crossroads.parse(hash_current);
+			}
+		}
+
+		function hasher_parse(hash_new, hash_old) {
+			crossroads.parse(hash_new);
+		}
+
+		wrappers_prepare();
+
+		hasher.initialized.add(hasher_init);
+		hasher.changed.add(hasher_parse);
+		hasher.init();
 	}
 
 
 
 // ******************************************* wrappers *******************************************
-	var wrappers_prepare = function(callback) {
-		if (locked('wrappers_prepare')) {
-			return false;
-		}
-
-		lock('wrappers_prepare');
-
+	var wrappers_prepare = function() {
 		$element.html(sprintf(
 			'<div class="klan-app-browser klan-issue-%s clearfix">' +
 				'<div class="wrapper-display"></div>' +
@@ -115,45 +110,11 @@ $.klan.app.browser = function(element, options) {
 		plugin.wrappers.display = $('.wrapper-display', $element);
 		plugin.wrappers.info = $('.wrapper-info', $element);
 		plugin.wrappers.log = $('.wrapper-log', $element);
-
-		flag('wrappers', 'prepared');
-
-		if (typeof callback === 'undefined') {
-		}
-		else {
-			callback();
-		}
-
-		unlock('wrappers_prepare');
 	}
 
 
 
 	// ******************************************* screen *******************************************
-	var screen_prepare = function(callback) {
-		if (locked('screen_prepare')) {
-			return false;
-		}
-
-		if (!flagged('wrappers', 'prepared')) {
-			return false;
-		}
-
-		lock('screen_prepare');
-
-		flag('screen', 'prepared');
-
-		if (typeof callback === 'undefined') {
-		}
-		else {
-			callback();
-		}
-
-		unlock('screen_prepare');
-	}
-
-
-
 	var screen_load = function() {
 		log(sprintf('loading s:%s', plugin.actual.screen), '>>');
 
@@ -330,11 +291,6 @@ $.klan.app.browser = function(element, options) {
 
 
 	// ******************************************* info *******************************************
-	var info_prepare = function() {
-	}
-
-
-
 	var info_render = function() {
 		plugin.wrappers.info.empty();
 
