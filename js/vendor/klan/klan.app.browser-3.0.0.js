@@ -40,6 +40,7 @@ $.klan.app.browser = function(element, options) {
 			$('body').addClass('debug');
 		}
 
+		plugin.actual.log_branch = 0;
 		plugin.actual.issue = plugin.settings.issue;
 
 		crossroads.addRoute('/{issue}', function(issue) {
@@ -55,22 +56,32 @@ $.klan.app.browser = function(element, options) {
 				plugin.cache.screens = responses[1].screens;
 				plugin.cache.texts = responses[2].texts;
 
-				plugin.cache.texts_indexed = {}
-				$.each(plugin.cache.texts, function(text_index, text) {
-					plugin.cache.texts_indexed[text.name.replace('/', '\\')] = text_index;
+				var screens_preload = []
+
+				$.each(plugin.cache.screens, function(screen_index, screen) {
+					screens_preload.push($.klan.api.issue.screens(plugin.actual.issue, screen_index));
 				});
 
-				plugin.engine = {
-					'ads': {},
-					'buttons': {},
-					'events': {},
-					'ivars': {},
-					'screen': null,
-					'svars': {},
-					'text': null
-				}
+				$.when.all(
+					screens_preload
+				).done(function(responses) {
+					plugin.cache.texts_indexed = {}
+					$.each(plugin.cache.texts, function(text_index, text) {
+						plugin.cache.texts_indexed[text.name.replace('/', '\\')] = text_index;
+					});
 
-				screen_load();
+					plugin.engine = {
+						'ads': {},
+						'buttons': {},
+						'events': {},
+						'ivars': {},
+						'screen': null,
+						'svars': {},
+						'text': null
+					}
+
+					screen_load();
+				});
 			});
 		});
 
@@ -116,14 +127,12 @@ $.klan.app.browser = function(element, options) {
 
 	// ******************************************* screen *******************************************
 	var screen_load = function() {
-		log(sprintf('loading s:%s', plugin.actual.screen), '>>');
-
 		$.when.all([
 			$.klan.api.issue.screens(plugin.actual.issue, plugin.actual.screen)
 		]).done(function(responses) {
 			plugin.cache.screen = responses[0];
 
-			log(sprintf('loaded s:%s, type_1:%s', plugin.actual.screen, plugin.cache.screen.type_1));
+			log(sprintf('screen s:%s, type_1:%s', plugin.actual.screen, plugin.cache.screen.type_1), '>>');
 
 			if (plugin.cache.screen.type_1 == 0) {
 				plugin.engine.events = {};
@@ -146,7 +155,7 @@ $.klan.app.browser = function(element, options) {
 			});
 			log(sprintf('macros s:%s', plugin.actual.screen), '<<');
 
-			log(sprintf('loading s:%s', plugin.actual.screen), '<<');
+			log(sprintf('screen s:%s', plugin.actual.screen), '<<');
 		});
 	}
 
@@ -222,7 +231,7 @@ $.klan.app.browser = function(element, options) {
 
 				if (button.hover_topleft_x || button.hover_topleft_y || button.hover_bottomright_x || button.hover_bottomright_y) {
 					plugin.wrappers.display.append(sprintf(
-						'<div id="action-%s-%s" data-id="%s" class="action" style="width:%spx;height:%spx;left:%spx;top:%spx;" title="e:%s"></div>',
+						'<div id="action-%s-%s" data-id="%s" class="action" style="width:%spx;height:%spx;left:%spx;top:%spx;" title="event b:%s"></div>',
 						plugin.actual.screen,
 						button.id,
 						button.id,
@@ -235,7 +244,7 @@ $.klan.app.browser = function(element, options) {
 				}
 				else {
 					plugin.wrappers.display.append(sprintf(
-						'<div id="action-%s-%s" data-id="%s" class="action" style="width:%spx;height:%spx;left:%spx;top:%spx;" title="e:%s"></div>',
+						'<div id="action-%s-%s" data-id="%s" class="action" style="width:%spx;height:%spx;left:%spx;top:%spx;" title="event b:%s"></div>',
 						plugin.actual.screen,
 						button.id,
 						button.id,
@@ -299,7 +308,7 @@ $.klan.app.browser = function(element, options) {
 		));
 		$.each(plugin.engine.ivars, function(ivar_index, ivar) {
 			plugin.wrappers.info.append(sprintf(
-				'<div>ivar %s = %s</div>',
+				'<div>ivar_%s = %s</div>',
 				ivar_index,
 				ivar
 			));
@@ -310,7 +319,7 @@ $.klan.app.browser = function(element, options) {
 		));
 		$.each(plugin.engine.svars, function(svar_index, svar) {
 			plugin.wrappers.info.append(sprintf(
-				'<div>svar %s = "%s"</div>',
+				'<div>svar_%s = "%s"</div>',
 				svar_index,
 				svar
 			));
@@ -320,7 +329,7 @@ $.klan.app.browser = function(element, options) {
 			'<div>* screen</div>'
 		));
 		plugin.wrappers.info.append(sprintf(
-			'<div>screen = %s</div>',
+			'<div>background = %s</div>',
 			plugin.engine.screen ? plugin.engine.screen.id : 'null'
 		));
 
@@ -328,7 +337,7 @@ $.klan.app.browser = function(element, options) {
 			'<div>* text</div>'
 		));
 		plugin.wrappers.info.append(sprintf(
-			'<div>text = %s</div>',
+			'<div>content = "%s"</div>',
 			plugin.engine.text ? plugin.engine.text.content : 'null'
 		));
 
@@ -337,10 +346,9 @@ $.klan.app.browser = function(element, options) {
 		));
 		$.each(plugin.engine.events, function(event_index, event) {
 			plugin.wrappers.info.append(sprintf(
-				'<div><span class="info-event-toggle" data-id="%s">event %s = %s</span></div>',
+				'<div><span class="info-event-toggle" data-id="%s">event b:%s</span></div>',
 				event_index,
-				event_index,
-				event
+				event_index
 			));
 			plugin.wrappers.info.append(sprintf(
 				'<div class="info-event-%s"></div>',
@@ -353,7 +361,6 @@ $.klan.app.browser = function(element, options) {
 		});
 		$('.info-event-toggle').click(function() {
 			$(sprintf('.info-event-%s', $(this).data('id'))).JSONView('toggle');
-
 			return false;
 		});
 	}
@@ -370,10 +377,50 @@ $.klan.app.browser = function(element, options) {
 	var log = function(string, mark) {
 		var mark = typeof mark !== 'undefined' ? mark : '*';
 
+		plugin.actual.log_id = Math.random().toString(36).substring(7);
+
 		$.klan.log(sprintf('[%s] %s %s', plugin.meta.name, mark, string));
 
+		if (mark == '<<') {
+			plugin.actual.log_branch--;
+		}
+
 		if (plugin.wrappers.log) {
-			plugin.wrappers.log.append(sprintf('<div>%s %s</div>', mark, string));
+			plugin.wrappers.log.append(sprintf(
+				'<div class="log-line-%s log-macro-toggle" data-id="%s">%s%s %s</div>',
+				plugin.actual.log_id,
+				plugin.actual.log_id,
+				'&nbsp;'.repeat(plugin.actual.log_branch),
+				mark,
+				string
+			));
+		}
+
+		if (mark == '>>') {
+			plugin.actual.log_branch++;
+		}
+	}
+
+
+
+	var log_macro = function(string, macro, mark) {
+		log(string, mark);
+
+		if (plugin.wrappers.log) {
+			plugin.wrappers.log.append(sprintf(
+				'<div class="log-macro-%s"></div>',
+				plugin.actual.log_id
+			));
+
+			$(sprintf('.log-macro-%s', plugin.actual.log_id)).JSONView(
+				JSON.stringify(macro),
+				{ 'collapsed': false, 'recursive_collapser': true }
+			).hide();
+
+			$(sprintf('.log-line-%s', plugin.actual.log_id)).click(function() {
+				$(sprintf('.log-macro-%s', $(this).data('id'))).toggle();
+				return false;
+			});
 		}
 	}
 
@@ -425,85 +472,106 @@ $.klan.app.browser = function(element, options) {
 		var log_base = sprintf('s:%s, m:%s, t:%s', plugin.actual.screen, macro_index, macro.type);
 
 		if (macro.type == 'button') {
-			log(sprintf('%s&nbsp; &nbsp;id = %s', log_base, macro.params.id));
 			if (macro.params.id < 32768) {
+				log_macro(sprintf('%s&nbsp; &nbsp;id = %s', log_base, macro.params.id), macro);
 				plugin.engine.buttons[macro.params.id] = macro.params;
+			}
+			else {
+				var macro_params_id = 65536 - macro.params.id;
+				log_macro(sprintf('%s&nbsp; &nbsp;id = %s(ivar_%s=>%s)', log_base, macro.params.id, macro_params_id, plugin.engine.ivars[macro_params_id]), macro);
+				plugin.engine.buttons[plugin.engine.ivars[macro_params_id]] = macro.params;
 			}
 		}
 
 		else if (macro.type == 'event') {
-			log(sprintf('%s&nbsp; &nbsp;id = %s', log_base, macro.params.id));
+			log_macro(sprintf('%s&nbsp; &nbsp;binding = %s', log_base, macro.params.id), macro);
 			run_event(macro.params.id);
 		}
 
 		else if (macro.type == 'gotopage') {
 			if (macro.params.id < 32768) {
-				log(sprintf('%s&nbsp; &nbsp;id = %s', log_base, macro.params.id));
+				log_macro(sprintf('%s&nbsp; &nbsp;id = %s', log_base, macro.params.id), macro);
 				plugin.actual.screen = macro.params.id;
 			}
 			else {
-				log(sprintf('%s&nbsp; &nbsp;id = %s (%s=>%s)', log_base, macro.params.id, 65536 - macro.params.id, plugin.engine.ivars[65536 - macro.params.id]));
+				log_macro(sprintf('%s&nbsp; &nbsp;id = %s (%s=>%s)', log_base, macro.params.id, 65536 - macro.params.id, plugin.engine.ivars[65536 - macro.params.id]), macro);
 				plugin.actual.screen = plugin.engine.ivars[65536 - macro.params.id];
 			}
 			screen_load();
 		}
 
 		else if (macro.type == 'if') {
-			var value_1 = null;
-			var value_2 = null;
+			var value_1 = macro.params.branches.branch_if.value_1;
+			var value_2 = macro.params.branches.branch_if.value_2;
 			var condition = null;
-			var condition_log = sprintf("%s?", macro.params.branches.branch_if.condition);
 
-			if (macro.params.branches.branch_if.value_1 < 32768) {
-				// TODO ???
-			}
-			else {
-				value_1 = plugin.engine.ivars[65536 - macro.params.branches.branch_if.value_1]
-			}
+			var log_value_1 = value_1;
+			var log_value_2 = value_2;
+			var log_condition = sprintf("<span style=\"color:red;\">%s?</span>", macro.params.branches.branch_if.condition);
 
-			value_2 = macro.params.branches.branch_if.value_2;
+			if (macro.params.branches.branch_if.value_1 >= 32768) {
+				value_1 = plugin.engine.ivars[65536 - macro.params.branches.branch_if.value_1];
+				log_value_1 = sprintf(
+					'%s(ivar_%s=>%s)',
+					macro.params.branches.branch_if.value_1,
+					65536 - macro.params.branches.branch_if.value_1,
+					value_1
+				);
+			}
 
 			if (macro.params.branches.branch_if.condition == 1) {
 				condition = (value_1 == value_2);
-				condition_log = '==';
+				log_condition = '==';
 			}
 			else if (macro.params.branches.branch_if.condition == 3) {
 // 				condition = (value_1 == value_2);
-// 				condition_log = '';
+// 				log_condition = '';
 			}
 
-			log(sprintf('%s&nbsp; &nbsp;%s(%s) %s %s(%s)', log_base, macro.params.branches.branch_if.value_1, value_1, condition_log, macro.params.branches.branch_if.value_2, value_2));
-			log(sprintf('macros m:%s', macro_index), '>>');
+			log_macro(
+				sprintf(
+					'%s&nbsp; &nbsp;%s %s %s%s',
+					log_base,
+					log_value_1,
+					log_condition,
+					log_value_2,
+					macro.params.branches.branch_else ? ' ... else' : ''
+				),
+				macro
+			);
 			if (condition) {
+				log(sprintf('macros m:%s, if', macro_index), '>>');
 				$.each(macro.params.branches.branch_if.macros, function(branch_macro_index, branch_macro) {
 					parse_macro(branch_macro, branch_macro_index);
 				});
+				log(sprintf('macros m:%s, if', macro_index), '<<');
 			}
 			else if (macro.params.branches.branch_else) {
+				log(sprintf('macros m:%s, else', macro_index), '>>');
 				$.each(macro.params.branches.branch_else.macros, function(branch_macro_index, branch_macro) {
 					parse_macro(branch_macro, branch_macro_index);
 				});
+				log(sprintf('macros m:%s, else', macro_index), '<<');
 			}
-			log(sprintf('macros m:%s', macro_index), '<<');
 		}
 
 		else if (macro.type == 'ivar/mov') {
-			log(sprintf('%s&nbsp; &nbsp;%s = %s', log_base, macro.params.variable, macro.params.value));
+			log_macro(sprintf('%s&nbsp; &nbsp;ivar_%s = %s', log_base, macro.params.variable, macro.params.value), macro);
 			plugin.engine.ivars[macro.params.variable] = macro.params.value;
 		}
 
 		else if (macro.type == 'keybutt') {
-			log(sprintf('%s&nbsp; &nbsp;TODO', log_base));
+			log_macro(sprintf('%s&nbsp; &nbsp;TODO', log_base), macro);
 			// TODO
 		}
 
 		else if (macro.type == 'reklama') {
-			log(sprintf('%s&nbsp; &nbsp;id = %s', log_base, macro.params.id));
+			log_macro(sprintf('%s&nbsp; &nbsp;id = %s', log_base, macro.params.id), macro);
 			plugin.engine.ads[macro.params.id] = macro.params;
 		}
 
 		else if (macro.type == 'screen') {
-			log(sprintf('%s&nbsp; &nbsp;%s', log_base, macro.params.id));
+			log_macro(sprintf('%s&nbsp; &nbsp;background = %s', log_base, macro.params.id), macro);
 			plugin.engine.screen = macro.params;
 		}
 
@@ -512,17 +580,17 @@ $.klan.app.browser = function(element, options) {
 		}
 
 		else if (macro.type == 'svar') {
-			log(sprintf('%s&nbsp; &nbsp;%s = "%s"', log_base, macro.params.variable, macro.params.value));
+			log_macro(sprintf('%s&nbsp; &nbsp;svar_%s = "%s"', log_base, macro.params.variable, macro.params.value), macro);
 			plugin.engine.svars[macro.params.variable] = macro.params.value;
 		}
 
 		else if (macro.type == 'text') {
-			log(sprintf('%s&nbsp; &nbsp;content = "%s"', log_base, macro.params.content));
+			log_macro(sprintf('%s&nbsp; &nbsp;content = "%s"', log_base, macro.params.content), macro);
 			plugin.engine.text = macro.params;
 		}
 
 		else if (macro.type == 'woknoshit') {
-			log(sprintf('%s&nbsp; &nbsp;TODO', log_base));
+			log_macro(sprintf('%s&nbsp; &nbsp;TODO', log_base), macro);
 			screen_render(true);
 		}
 
@@ -536,7 +604,7 @@ $.klan.app.browser = function(element, options) {
 
 
 	var run_event = function(event_id) {
-		log(sprintf('event e:%s', event_id), '>>');
+		log(sprintf('event b:%s', event_id), '>>');
 
 		if (event_id) {
 			log(sprintf('macros e:%s', event_id), '>>');
@@ -546,10 +614,11 @@ $.klan.app.browser = function(element, options) {
 			log(sprintf('macros e:%s', event_id), '<<');
 		}
 		else {
+			log('Exit to DOS :-)');
 			alert('Exit to DOS :-)');
 		}
 
-		log(sprintf('event e:%s', event_id), '<<');
+		log(sprintf('event b:%s', event_id), '<<');
 	}
 
 

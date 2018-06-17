@@ -92,9 +92,15 @@ body {
 	overflow: auto;
 }
 
-.wrapper-info .info-event-toggle {
+.wrapper-info .info-event-toggle,
+.wrapper-log .log-macro-toggle {
 	cursor: pointer;
 	cursor: hand;
+}
+
+.wrapper-info .info-event-toggle:hover,
+.wrapper-log .log-macro-toggle:hover {
+	background-color: #333;
 }
 
 .wrapper-display .screen {
