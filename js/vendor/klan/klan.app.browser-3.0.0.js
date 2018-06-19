@@ -44,6 +44,9 @@ $.klan.app.browser = function(element, options) {
 		plugin.actual.issue = plugin.settings.issue;
 
 		crossroads.addRoute('/{issue}', function(issue) {
+			plugin.cache = {}
+			plugin.actual = {}
+			plugin.actual.log_branch = 0;
 			plugin.actual.issue = issue;
 			plugin.actual.screen = 1;
 
@@ -80,6 +83,7 @@ $.klan.app.browser = function(element, options) {
 						'text': null
 					}
 
+					log_empty();
 					screen_load();
 				});
 			});
@@ -647,6 +651,7 @@ $.klan.app.browser = function(element, options) {
 
 		log(sprintf('event b:%s', event_id), '<<');
 	}
+
 
 
 	plugin.init();
