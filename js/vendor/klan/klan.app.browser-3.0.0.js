@@ -478,7 +478,7 @@ $.klan.app.browser = function(element, options) {
 			}
 			else {
 				var macro_params_id = 65536 - macro.params.id;
-				log_macro(sprintf('%s&nbsp; &nbsp;id = %s(ivar_%s=>%s)', log_base, macro.params.id, macro_params_id, plugin.engine.ivars[macro_params_id]), macro);
+				log_macro(sprintf('%s&nbsp; &nbsp;id = %s[ivar_%s=>%s]', log_base, macro.params.id, macro_params_id, plugin.engine.ivars[macro_params_id]), macro);
 				plugin.engine.buttons[plugin.engine.ivars[macro_params_id]] = macro.params;
 			}
 		}
@@ -494,7 +494,7 @@ $.klan.app.browser = function(element, options) {
 				plugin.actual.screen = macro.params.id;
 			}
 			else {
-				log_macro(sprintf('%s&nbsp; &nbsp;id = %s (%s=>%s)', log_base, macro.params.id, 65536 - macro.params.id, plugin.engine.ivars[65536 - macro.params.id]), macro);
+				log_macro(sprintf('%s&nbsp; &nbsp;id = %s[%s=>%s]', log_base, macro.params.id, 65536 - macro.params.id, plugin.engine.ivars[65536 - macro.params.id]), macro);
 				plugin.actual.screen = plugin.engine.ivars[65536 - macro.params.id];
 			}
 			screen_load();
@@ -507,12 +507,12 @@ $.klan.app.browser = function(element, options) {
 
 			var log_value_1 = value_1;
 			var log_value_2 = value_2;
-			var log_condition = sprintf("<span style=\"color:red;\">%s?</span>", macro.params.branches.branch_if.condition);
+			var log_condition = sprintf('<span style="color:red;">%s?</span>', macro.params.branches.branch_if.condition);
 
 			if (macro.params.branches.branch_if.value_1 >= 32768) {
 				value_1 = plugin.engine.ivars[65536 - macro.params.branches.branch_if.value_1];
 				log_value_1 = sprintf(
-					'%s(ivar_%s=>%s)',
+					'%s[ivar_%s=>%s]',
 					macro.params.branches.branch_if.value_1,
 					65536 - macro.params.branches.branch_if.value_1,
 					value_1
@@ -524,8 +524,8 @@ $.klan.app.browser = function(element, options) {
 				log_condition = '==';
 			}
 			else if (macro.params.branches.branch_if.condition == 3) {
-// 				condition = (value_1 == value_2);
-// 				log_condition = '';
+				condition = (value_1 != value_2);
+				log_condition = '<span style="color:red;">!=?</span>';
 			}
 
 			log_macro(
@@ -556,7 +556,19 @@ $.klan.app.browser = function(element, options) {
 		}
 
 		else if (macro.type == 'ivar/mov') {
-			log_macro(sprintf('%s&nbsp; &nbsp;ivar_%s = %s', log_base, macro.params.variable, macro.params.value), macro);
+			log_macro(
+				sprintf(
+					'%s&nbsp; &nbsp;ivar_%s = %s%s',
+					log_base,
+					macro.params.
+					variable,
+					typeof plugin.engine.ivars[macro.params.variable] !== 'undefined' ?
+						sprintf('%s=>', plugin.engine.ivars[macro.params.variable]) :
+						'',
+					macro.params.value
+				),
+				macro
+			);
 			plugin.engine.ivars[macro.params.variable] = macro.params.value;
 		}
 
@@ -580,7 +592,18 @@ $.klan.app.browser = function(element, options) {
 		}
 
 		else if (macro.type == 'svar') {
-			log_macro(sprintf('%s&nbsp; &nbsp;svar_%s = "%s"', log_base, macro.params.variable, macro.params.value), macro);
+			log_macro(
+				sprintf(
+					'%s&nbsp; &nbsp;svar_%s = %s"%s"',
+					log_base,
+					macro.params.variable,
+					typeof plugin.engine.svars[macro.params.variable] !== 'undefined' ?
+						sprintf('"%s"=>', plugin.engine.svars[macro.params.variable]) :
+						'',
+					macro.params.value
+				),
+				macro
+			);
 			plugin.engine.svars[macro.params.variable] = macro.params.value;
 		}
 
@@ -594,8 +617,12 @@ $.klan.app.browser = function(element, options) {
 			screen_render(true);
 		}
 
+		else if (macro.type == 'snap') {
+			log_macro(sprintf('%s&nbsp; &nbsp;foo = %s TODO', log_base, macro.params.foo), macro);
+		}
+
 		else {
-			log(sprintf('%s&nbsp; &nbsp;UNKNOWN MACRO', log_base));
+			log_macro(sprintf('%s&nbsp; &nbsp;UNKNOWN MACRO', log_base), macro);
 		}
 
 		info_render();
