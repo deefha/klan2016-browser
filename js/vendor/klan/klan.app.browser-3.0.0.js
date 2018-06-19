@@ -483,7 +483,7 @@ $.klan.app.browser = function(element, options) {
 			else {
 				var macro_params_id = 65536 - macro.params.id;
 				log_macro(sprintf('%s&nbsp; &nbsp;id = %s[ivar_%s=>%s]', log_base, macro.params.id, macro_params_id, plugin.engine.ivars[macro_params_id]), macro);
-				plugin.engine.buttons[plugin.engine.ivars[macro_params_id]] = macro.params;
+// 				plugin.engine.buttons[plugin.engine.ivars[macro_params_id]] = macro.params;
 			}
 		}
 
