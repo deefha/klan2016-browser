@@ -148,7 +148,7 @@ $.klan.app.browser = function(element, options) {
 
 			log(sprintf('events s:%s', plugin.actual.screen), '>>');
 			$.each(plugin.cache.screen.events, function(event_index, event) {
-				log(sprintf('s:%s, e:%s, b:%s', plugin.actual.screen, event_index, event.binding));
+				log_macro(sprintf('s:%s, e:%s, b:%s', plugin.actual.screen, event_index, event.binding), event.macros);
 				plugin.engine.events[event.binding] = event.macros;
 			});
 			log(sprintf('events s:%s', plugin.actual.screen), '<<');
@@ -160,6 +160,8 @@ $.klan.app.browser = function(element, options) {
 			log(sprintf('macros s:%s', plugin.actual.screen), '<<');
 
 			log(sprintf('screen s:%s', plugin.actual.screen), '<<');
+
+			log_scroll();
 		});
 	}
 
@@ -293,10 +295,9 @@ $.klan.app.browser = function(element, options) {
 		}
 
 		$('.action').click(function() {
-			log_empty();
+ 			log_break();
 			run_event($(this).data('id'));
 			screen_render(true);
-
 			return false;
 		});
 	}
@@ -344,29 +345,6 @@ $.klan.app.browser = function(element, options) {
 			'<div>content = "%s"</div>',
 			plugin.engine.text ? plugin.engine.text.content : 'null'
 		));
-
-		plugin.wrappers.info.append(sprintf(
-			'<div>* events</div>'
-		));
-		$.each(plugin.engine.events, function(event_index, event) {
-			plugin.wrappers.info.append(sprintf(
-				'<div><span class="info-event-toggle" data-id="%s">event b:%s</span></div>',
-				event_index,
-				event_index
-			));
-			plugin.wrappers.info.append(sprintf(
-				'<div class="info-event-%s"></div>',
-				event_index
-			));
-			$(sprintf('.info-event-%s', event_index)).JSONView(
-				JSON.stringify(event),
-				{ 'collapsed': true, 'recursive_collapser': true }
-			);
-		});
-		$('.info-event-toggle').click(function() {
-			$(sprintf('.info-event-%s', $(this).data('id'))).JSONView('toggle');
-			return false;
-		});
 	}
 
 
@@ -374,6 +352,18 @@ $.klan.app.browser = function(element, options) {
 	// ******************************************* logging *******************************************
 	var log_empty = function() {
 		plugin.wrappers.log.empty();
+	}
+
+
+
+	var log_scroll = function() {
+		plugin.wrappers.log.animate({scrollTop: plugin.wrappers.log.get(0).scrollHeight}, 100);
+	}
+
+
+
+	var log_break = function() {
+		log('&nbsp;', '');
 	}
 
 
@@ -391,7 +381,7 @@ $.klan.app.browser = function(element, options) {
 
 		if (plugin.wrappers.log) {
 			plugin.wrappers.log.append(sprintf(
-				'<div class="log-line-%s log-macro-toggle" data-id="%s">%s%s %s</div>',
+				'<div class="log-line-%s" data-id="%s">%s%s %s</div>',
 				plugin.actual.log_id,
 				plugin.actual.log_id,
 				'&nbsp;'.repeat(plugin.actual.log_branch),
@@ -420,6 +410,8 @@ $.klan.app.browser = function(element, options) {
 				JSON.stringify(macro),
 				{ 'collapsed': false, 'recursive_collapser': true }
 			).hide();
+
+			$(sprintf('.log-line-%s', plugin.actual.log_id)).addClass('log-macro-toggle');
 
 			$(sprintf('.log-line-%s', plugin.actual.log_id)).click(function() {
 				$(sprintf('.log-macro-%s', $(this).data('id'))).toggle();
@@ -650,6 +642,8 @@ $.klan.app.browser = function(element, options) {
 		}
 
 		log(sprintf('event b:%s', event_id), '<<');
+
+		log_scroll();
 	}
 
 

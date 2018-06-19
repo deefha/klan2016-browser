@@ -83,6 +83,7 @@ body {
 	height: 95vh;
 	overflow: auto;
 	margin-right: 25px;
+	background-color: black;
 }
 
 .wrapper-log {
@@ -90,6 +91,7 @@ body {
 	width: 400px;
 	height: 95vh;
 	overflow: auto;
+	background-color: black;
 }
 
 .wrapper-info .info-event-toggle,
